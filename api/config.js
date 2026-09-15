@@ -15,7 +15,7 @@ module.exports = async (req, res) => {
     const { data, error } = await supabase
       .from('partidos')
       .select('nombre, estado')
-      .eq('id_partido', id)
+      .ilike('id_partido', id.replace(/[%_]/g, '\\$&'))
       .maybeSingle();
 
     if (error) {
