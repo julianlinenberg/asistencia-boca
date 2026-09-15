@@ -29,8 +29,8 @@ module.exports = async (req, res) => {
     // 1. Verificar que el partido exista y esté abierto
     const { data: partido, error: errPartido } = await supabase
       .from('partidos')
-      .select('nombre, estado')
-      .eq('id_partido', idPartido)
+      .select('id_partido, nombre, estado')
+      .ilike('id_partido', idPartido.replace(/[%_]/g, '\\$&'))
       .maybeSingle();
 
     if (errPartido) {
@@ -42,6 +42,9 @@ module.exports = async (req, res) => {
     if ((partido.estado || '').trim().toLowerCase() !== 'abierto') {
       return res.status(200).json({ exito: false, mensaje: 'La carga de asistencia para este partido está cerrada.' });
     }
+
+    // Usamos el id_partido tal como está guardado en la tabla, no el que llegó de la URL
+    const idPartidoReal = partido.id_partido;
 
     // 2. Verificar contra el padrón
     const { data: socio, error: errSocio } = await supabase
@@ -61,7 +64,7 @@ module.exports = async (req, res) => {
     const { data: existente, error: errExistente } = await supabase
       .from('respuestas')
       .select('id')
-      .eq('id_partido', idPartido)
+      .eq('id_partido', idPartidoReal)
       .eq('numero_socio', numero)
       .maybeSingle();
 
@@ -74,7 +77,7 @@ module.exports = async (req, res) => {
 
     // 4. Guardar la respuesta
     const { error: errInsert } = await supabase.from('respuestas').insert({
-      id_partido: idPartido,
+      id_partido: idPartidoReal,
       numero_socio: numero,
       categoria: datos.categoria || '',
       dni: dni,
