@@ -14,8 +14,8 @@ module.exports = async (req, res) => {
 
     const { data, error } = await supabase
       .from('partidos')
-      .select('nombre, estado')
-      .ilike('id_partido', id.replace(/[%_]/g, '\\$&'))
+      .select('nombre, estado, cierra_en')
+      .eq('id_partido', id)
       .maybeSingle();
 
     if (error) {
@@ -25,10 +25,18 @@ module.exports = async (req, res) => {
       return res.status(200).json({ existe: false });
     }
 
+    let estado = (data.estado || '').trim().toLowerCase();
+
+    // Si sigue "abierto" en la tabla pero ya pasó la hora fijada en cierra_en, se considera cerrado
+    if (estado === 'abierto' && data.cierra_en && new Date() >= new Date(data.cierra_en)) {
+      estado = 'cerrado';
+    }
+
     return res.status(200).json({
       existe: true,
       nombre: data.nombre,
-      estado: (data.estado || '').trim().toLowerCase()
+      estado: estado,
+      cierra_en: data.cierra_en || null
     });
   } catch (err) {
     return res.status(500).json({ existe: false, mensaje: 'Error interno: ' + err.message });
