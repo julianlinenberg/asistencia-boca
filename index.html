@@ -23,6 +23,12 @@
     border: 3px solid #ffd200;
     font-size: 20px;
   }
+  #cierraAviso {
+    text-align: center;
+    font-size: 14px;
+    margin-top: 8px;
+    color: #0a2856;
+  }
   label { font-weight: bold; display: block; margin-top: 14px; font-size: 15px; }
   input, select {
     width: 100%;
@@ -56,9 +62,38 @@
     border-radius: 4px;
     word-break: break-all;
   }
-  #mensaje { font-weight: bold; margin-top: 12px; }
+  #mensaje { font-weight: bold; margin-top: 12px; min-height: 20px; }
   #estadoInicial { text-align: center; margin-top: 40px; font-size: 17px; }
   .oculto { display: none; }
+
+  /* Popup modal para mensajes de error/confirmación */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(10, 40, 86, 0.65);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .modal-overlay.visible { display: flex; }
+  .modal-box {
+    background: #fff;
+    border: 3px solid #0a2856;
+    border-radius: 8px;
+    padding: 24px 20px;
+    max-width: 340px;
+    width: 100%;
+    text-align: center;
+  }
+  .modal-box p {
+    font-weight: bold;
+    font-size: 16px;
+    margin: 0 0 16px;
+    color: #0a2856;
+  }
+  .modal-box button { margin-top: 0; }
 </style>
 </head>
 <body>
@@ -67,22 +102,23 @@
 
   <div id="contenido" class="oculto">
     <h2 id="tituloPartido"></h2>
+    <p id="cierraAviso" class="oculto"></p>
 
     <div id="formulario">
       <label>Nº de socio/a (sin puntos)</label>
-      <input type="text" id="numeroSocio" inputmode="numeric">
+      <input type="text" id="numeroSocio" inputmode="numeric" oninput="limpiarSoloNumeros(this)">
 
       <label>Categoría de socio/a</label>
-      <input type="text" id="categoria">
+      <input type="text" id="categoria" oninput="limpiarSoloLetras(this)">
 
       <label>DNI (sin puntos)</label>
-      <input type="text" id="dni" inputmode="numeric">
+      <input type="text" id="dni" inputmode="numeric" oninput="limpiarSoloNumeros(this)">
 
       <label>Nombre y apellido</label>
-      <input type="text" id="nombreApellido">
+      <input type="text" id="nombreApellido" oninput="limpiarSoloLetras(this)">
 
       <label>Localidad</label>
-      <input type="text" id="localidad">
+      <input type="text" id="localidad" oninput="limpiarSoloLetras(this)">
 
       <label>Referente</label>
       <input type="text" value="MARCELO FERNANDEZ" disabled>
@@ -106,8 +142,32 @@
     <p id="mensaje"></p>
   </div>
 
+  <div id="modalMensaje" class="modal-overlay">
+    <div class="modal-box">
+      <p id="modalTexto"></p>
+      <button onclick="cerrarModal()">Entendido</button>
+    </div>
+  </div>
+
 <script>
   const idPartido = window.location.pathname.replace(/^\/+|\/+$/g, '');
+
+  function limpiarSoloNumeros(el) {
+    el.value = el.value.replace(/[^0-9]/g, '');
+  }
+
+  function limpiarSoloLetras(el) {
+    el.value = el.value.replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ\s'-]/g, '');
+  }
+
+  function mostrarModal(texto) {
+    document.getElementById('modalTexto').innerText = texto;
+    document.getElementById('modalMensaje').classList.add('visible');
+  }
+
+  function cerrarModal() {
+    document.getElementById('modalMensaje').classList.remove('visible');
+  }
 
   function mostrarEstadoInicial(texto) {
     document.getElementById('estadoInicial').innerText = texto;
@@ -136,6 +196,13 @@
       document.getElementById('estadoInicial').classList.add('oculto');
       document.getElementById('contenido').classList.remove('oculto');
       document.getElementById('tituloPartido').innerText = info.nombre;
+
+      if (info.cierra_en) {
+        const hora = new Date(info.cierra_en).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+        const aviso = document.getElementById('cierraAviso');
+        aviso.innerText = `Formulario disponible hasta las ${hora} hs`;
+        aviso.classList.remove('oculto');
+      }
     } catch (err) {
       mostrarEstadoInicial('No se pudo conectar. Probá de nuevo en unos minutos.');
     }
@@ -144,10 +211,9 @@
   function mostrarConfirmacion() {
     const numero = document.getElementById('numeroSocio').value.trim();
     if (!numero) {
-      document.getElementById('mensaje').innerText = 'Ingresá tu número de socio antes de continuar.';
+      mostrarModal('Ingresá tu número de socio antes de continuar.');
       return;
     }
-    document.getElementById('mensaje').innerText = '';
     document.getElementById('numeroConfirmado').innerText = numero;
     document.getElementById('formulario').classList.add('oculto');
     document.getElementById('confirmacion').classList.remove('oculto');
@@ -179,12 +245,14 @@
         body: JSON.stringify(datos)
       });
       const data = await resp.json();
-      document.getElementById('mensaje').innerText = data.mensaje;
+      document.getElementById('mensaje').innerText = '';
+      mostrarModal(data.mensaje);
       if (!data.exito) {
         document.getElementById('formulario').classList.remove('oculto');
       }
     } catch (err) {
-      document.getElementById('mensaje').innerText = 'No se pudo enviar. Probá de nuevo.';
+      document.getElementById('mensaje').innerText = '';
+      mostrarModal('No se pudo enviar. Probá de nuevo.');
       document.getElementById('formulario').classList.remove('oculto');
     }
   }
